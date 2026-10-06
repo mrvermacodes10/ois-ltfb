@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body { background: #ffffff; color: #13161c; font-feature-settings: "tnum" 1; }
+* { font-variant-numeric: tabular-nums; }
+
+/* Clean editorial look: no decorative background texture. Kept as a
+   selector (rather than removing every usage across ~8 page files) so it's
+   simply a no-op now — nothing renders from it. */
+.pitch-texture { background-image: none; }
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(16, 20, 28, 0.04);
+}
+.scoreboard-digit { font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.01em; }
+
+.btn-primary {
+  background: #1e7a3c; color: #ffffff; border-radius: 6px; padding: 0.6rem 1.25rem;
+  font-weight: 600; transition: background .15s ease;
+  display: inline-flex; align-items: center; gap: .5rem;
+}
+.btn-primary:hover { background: #166030; }
+.btn-primary:disabled { background: #a8b0bb; color: #ffffff; cursor: not-allowed; }
+
+.btn-secondary {
+  background: #ffffff; color: #13161c; border: 1px solid #d7dbe2;
+  border-radius: 6px; padding: 0.55rem 1.2rem; font-weight: 600;
+  transition: background .15s ease, border-color .15s ease; display: inline-flex; align-items: center; gap: .5rem;
+}
+.btn-secondary:hover { border-color: #1e7a3c; background: #f4f8f5; }
+
+.btn-gold { background: #b8860b; color: #ffffff; border-radius: 6px; padding: .55rem 1.2rem; font-weight: 600; }
+.btn-gold:hover { background: #9a6f09; }
+
+.badge-live { display: inline-flex; align-items: center; gap: .4rem; background: #fdecec; color: #b42318; border: 1px solid #f3b4ae; border-radius: 4px; padding: .2rem .6rem; font-size: .7rem; font-weight: 700; letter-spacing: .04em; }
+.badge-live .dot { width: 6px; height: 6px; border-radius: 999px; background: #d92d20; }
+.badge-status { display: inline-flex; align-items: center; border-radius: 4px; padding: .2rem .6rem; font-size: .7rem; font-weight: 700; letter-spacing: .04em; }
+
+.input { background: #ffffff; border: 1px solid #d7dbe2; border-radius: 6px; padding: .55rem .75rem; color: #13161c; font-size: .875rem; width: 100%; }
+.input:focus { outline: none; border-color: #1e7a3c; }
+.label { font-size: .7rem; font-weight: 600; letter-spacing: .04em; color: #6b7280; text-transform: uppercase; }
+.gold-text { color: #9a6f09; }
+
+::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar-thumb { background: #d7dbe2; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:.001ms!important; transition-duration:.001ms!important; } }

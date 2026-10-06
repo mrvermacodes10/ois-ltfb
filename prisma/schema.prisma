@@ -1,0 +1,261 @@
+// OIS Lunchtime Footy (LTFB) — the digital home of the league.
+// A brand new, independent project. PostgreSQL in every environment.
+//
+// Design principle, same as every stats-driven project in this family:
+// nothing derivable from match data is stored redundantly. Goals, wins,
+// standings, top scorers are all computed fresh from Match/MatchEvent rows
+// in src/lib/stats.ts — editing a past result automatically and correctly
+// recalculates everything that depends on it.
+//
+// Everything is scoped to a Season, so starting a new season never deletes
+// history — it just means new Matches/Results point at the new Season.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Session {
+  token     String   @id
+  adminId   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// A season/term (e.g. "2026/27", or "Semester 1 2026"). Matches, 2v2
+// results, and awards all belong to a season, so creating a new one never
+// touches history.
+model Season {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isCurrent Boolean  @default(false)
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime @default(now())
+
+  matches       Match[]
+  awards        Award[]
+  twoVTwoResults TwoVTwoResult[]
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  logoUrl     String?
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  players      Player[]
+  homeMatches  Match[]  @relation("MatchTeamA")
+  awayMatches  Match[]  @relation("MatchTeamB")
+  awards       Award[]  @relation("AwardTeam")
+}
+
+model Player {
+  id         String   @id @default(cuid())
+  name       String
+  ltfbId     String?  // the Google Site's "OIS LTFB ID" concept — admin fills in
+  photoUrl   String?
+  position   String?
+  bio        String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  teamId String?
+  team   Team?  @relation(fields: [teamId], references: [id])
+
+  events          MatchEvent[]       @relation("EventPlayer")
+  motmAwards      MatchMotm[]
+  awards          Award[]            @relation("AwardPlayer")
+  achievements    PlayerAchievement[]
+  pairsAsPlayer1  TwoVTwoPair[]      @relation("PairPlayer1")
+  pairsAsPlayer2  TwoVTwoPair[]      @relation("PairPlayer2")
+  twoVTwoMvp      TwoVTwoResult[]    @relation("TwoVTwoMvp")
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  createdAt   DateTime @default(now())
+
+  playerAwards PlayerAchievement[]
+}
+
+model PlayerAchievement {
+  id            String      @id @default(cuid())
+  playerId      String
+  player        Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  notes         String?
+  awardedAt     DateTime    @default(now())
+}
+
+model Match {
+  id       String @id @default(cuid())
+  seasonId String
+  season   Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  teamAId String
+  teamA   Team   @relation("MatchTeamA", fields: [teamAId], references: [id])
+  teamBId String
+  teamB   Team   @relation("MatchTeamB", fields: [teamBId], references: [id])
+
+  scoreA Int?
+  scoreB Int?
+  date   DateTime
+  time   String?
+  status String   @default("SCHEDULED") // SCHEDULED | LIVE | COMPLETED
+  notes  String?
+  photoUrl String?
+
+  events MatchEvent[]
+  motms  MatchMotm[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// GOAL and ASSIST events attribute individual stats to a player — the
+// source of truth for top scorers / assist charts.
+model MatchEvent {
+  id       String  @id @default(cuid())
+  matchId  String
+  match    Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  playerId String?
+  player   Player? @relation("EventPlayer", fields: [playerId], references: [id])
+  type     String // GOAL | ASSIST | OTHER
+  createdAt DateTime @default(now())
+}
+
+// Separate join table (not a single mvpId on Match) because real LTFB
+// history has matches with TWO shared MOTMs (e.g. "Naman Nagori/Nishil P").
+model MatchMotm {
+  id       String @id @default(cuid())
+  matchId  String
+  match    Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+}
+
+// Database-backed, fully custom awards — e.g. the real Semester Awards
+// (Messi/CR7/Yashin/Neymar/Zidane/Ramos), extendable to any future award.
+model Award {
+  id          String   @id @default(cuid())
+  name        String   // e.g. "MVP (Messi Award)"
+  category    String?  // optional grouping, e.g. "Semester 1"
+  description String?
+  playerId    String?
+  player      Player?  @relation("AwardPlayer", fields: [playerId], references: [id])
+  teamId      String?
+  team        Team?    @relation("AwardTeam", fields: [teamId], references: [id])
+  seasonId    String?
+  season      Season?  @relation(fields: [seasonId], references: [id])
+  imageUrl    String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  imageUrl  String?
+  published Boolean  @default(true)
+  featured  Boolean  @default(false)
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ---------- 2v2 League (brand new, NOT fantasy) ----------
+
+model TwoVTwoPair {
+  id        String   @id @default(cuid())
+  name      String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  player1Id String
+  player1   Player @relation("PairPlayer1", fields: [player1Id], references: [id])
+  player2Id String
+  player2   Player @relation("PairPlayer2", fields: [player2Id], references: [id])
+
+  resultsWon  TwoVTwoResult[] @relation("ResultWinner")
+  resultsLost TwoVTwoResult[] @relation("ResultOpponent")
+}
+
+// A single day's 2v2 outcome: who won, optionally who they beat, an
+// optional free-text score, and an optional MVP — matches the real
+// "5 October — Winner: Neel + Nishil" workflow exactly.
+model TwoVTwoResult {
+  id       String  @id @default(cuid())
+  seasonId String
+  season   Season  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  date      DateTime
+  winningPairId String
+  winningPair   TwoVTwoPair @relation("ResultWinner", fields: [winningPairId], references: [id])
+  // Optional: who they beat. Left blank, entry is just "date + winner" (the
+  // fast path). Filled in, it enables real appearances/win %% for BOTH
+  // pairs — see computePairRecords in src/lib/stats.ts.
+  opponentPairId String?
+  opponentPair   TwoVTwoPair? @relation("ResultOpponent", fields: [opponentPairId], references: [id])
+  scoreNote String? // free-text, e.g. "5-3" — optional, fast entry over structured score
+  mvpPlayerId String?
+  mvpPlayer   Player? @relation("TwoVTwoMvp", fields: [mvpPlayerId], references: [id])
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Single-row table of site-wide, admin-editable settings and homepage content.
+model SiteSettings {
+  id                 String   @id @default("singleton")
+  leagueName         String   @default("OIS Lunchtime Footy")
+  shortName          String   @default("LTFB")
+  currentSeasonLabel String   @default("2026/27")
+  heroTitle          String   @default("OIS LUNCHTIME FOOTY")
+  heroSubtitle       String   @default("The home of everything LTFB")
+  announcementBanner String?
+  footerText         String   @default("OIS Lunchtime Footy — play, compete, represent.")
+  pointsForWin       Int      @default(3)
+  pointsForDraw      Int      @default(1)
+  pointsForLoss      Int      @default(0)
+  playerIdInfo       String?  // registration / Player ID instructions, admin-editable
+  showAwards         Boolean  @default(true)
+  showHistory        Boolean  @default(true)
+  show2v2            Boolean  @default(true)
+  showAnnouncements  Boolean  @default(true)
+  featuredPlayerId   String?
+  featuredMatchId    String?
+  featuredTeamId     String?
+  updatedAt          DateTime @updatedAt
+}
+
+model AdminActivity {
+  id        String   @id @default(cuid())
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+}

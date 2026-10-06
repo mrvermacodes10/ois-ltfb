@@ -1,0 +1,23 @@
+Packaged: Tue Oct 06 2026, 04:45 UTC
+
+To confirm you extracted THIS version (not a stale copy), open:
+  src/app/admin/(protected)/2v2/page.tsx
+
+Line 35 should read exactly:
+  winningPairLabel: pairLabel(r.winningPair),
+
+Lines 8-16 (the Prisma query) should read exactly:
+    prisma.twoVTwoResult.findMany({
+      include: {
+        winningPair: { include: { player1: true, player2: true } },
+        opponentPair: { include: { player1: true, player2: true } },
+        mvpPlayer: true,
+      },
+      orderBy: { date: "desc" },
+    }),
+
+If your local copy shows "winningPairLabel: pairLabel(r.winningPair)," at
+line 31 instead of line 35, or shows "winningPair: true" (not nested) on
+line 9, you are looking at an OLD extraction — delete your local folder
+entirely and re-extract this zip fresh, rather than overwriting into the
+same directory.
